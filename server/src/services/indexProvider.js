@@ -2,11 +2,6 @@ import { addMonths, roundUsd, startOfMonth } from '../utils/dateMath.js';
 
 export class ArquilerProvider {
   async getVariation({ indexType, increment }) {
-    const baseUrl = process.env.ARQUILER_API_URL;
-    const apiKey = process.env.ARQUILER_API_KEY;
-
-    if (!baseUrl || !apiKey) return null;
-
 
     const url = `https://api.argly.com.ar/v1/${indexType.toLowerCase()}`;
     const options = {

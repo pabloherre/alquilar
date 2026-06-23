@@ -1,15 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Alert,
-  Box,
-  Button,
-  Card,
-  CardContent,
-  Stack,
-  TextField,
-  Typography
-} from '@mui/material';
+import { Alert, Box, Button, Card, CardContent, Stack, TextField, Typography } from '@mui/material';
 import LoginIcon from '@mui/icons-material/Login';
 import { useAuth } from '../context/AuthContext';
 
@@ -27,7 +18,7 @@ export default function LoginPage() {
       await login(email, password);
       navigate('/');
     } catch (err) {
-      setError(err?.response?.data?.message || 'Error de autenticación');
+      setError(err?.response?.data?.message || 'Error de autenticaciï¿½n');
     }
   };
 
@@ -38,10 +29,10 @@ export default function LoginPage() {
           <Stack component="form" onSubmit={onSubmit} spacing={2}>
             <Typography variant="h5">Ingresar</Typography>
             <Typography variant="body2" color="text.secondary">
-              Accedé al panel de contratos y recibos.
+              AccedÃ© al panel de contratos y recibos.
             </Typography>
             <TextField label="Email" value={email} onChange={(e) => setEmail(e.target.value)} required fullWidth />
-            <TextField label="Contraseña" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required fullWidth />
+            <TextField label="ContraseÃ±a" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required fullWidth />
             {error && <Alert severity="error">{error}</Alert>}
             <Button type="submit" variant="contained" size="large" startIcon={<LoginIcon />}>
               Entrar

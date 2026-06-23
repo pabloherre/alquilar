@@ -1,0 +1,9 @@
+node_modules
+.env
+server/node_modules
+client/node_modules
+server/storage/receipts/*.pdf
+server/server/storage/receipts/*.pdf
+.idea/
+.junie/
+client/dist

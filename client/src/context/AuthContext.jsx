@@ -16,6 +16,13 @@ export function AuthProvider({ children }) {
     setUser(data.user);
   };
 
+  const loginWithGoogle = async (credential) => {
+    const { data } = await api.post('/auth/google', { credential });
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    setUser(data.user);
+  };
+
   const loginWithMagic = async (token) => {
     const { data } = await api.post('/auth/magic-link/login', { token });
     localStorage.setItem('token', data.token);
@@ -29,7 +36,10 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
-  const value = useMemo(() => ({ user, login, loginWithMagic, logout }), [user]);
+  const value = useMemo(
+    () => ({ user, login, loginWithGoogle, loginWithMagic, logout }),
+    [user]
+  );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

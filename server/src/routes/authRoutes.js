@@ -98,6 +98,10 @@ router.post('/magic-link/login', async (req, res) => {
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+if (!process.env.GOOGLE_CLIENT_ID) {
+  console.warn('[auth] GOOGLE_CLIENT_ID no configurado — /auth/google no verificará audience');
+}
+
 router.post('/google', async (req, res) => {
   const { credential } = req.body;
   if (!credential) return res.status(400).json({ message: 'credential requerido' });

@@ -106,6 +106,10 @@ router.post('/google', async (req, res) => {
   const { credential } = req.body;
   if (!credential) return res.status(400).json({ message: 'credential requerido' });
 
+  if (!process.env.GOOGLE_CLIENT_ID) {
+    return res.status(503).json({ message: 'Google OAuth no está configurado en el servidor' });
+  }
+
   let payload;
   try {
     const ticket = await googleClient.verifyIdToken({
@@ -117,28 +121,38 @@ router.post('/google', async (req, res) => {
     return res.status(401).json({ message: 'Token de Google inválido' });
   }
 
-  const { sub: googleId, email, name } = payload;
+  const { sub: googleId, email, name: googleName, email_verified } = payload;
+  const name = googleName || email.split('@')[0];
 
-  // 1. Buscar por googleId
-  let user = await User.findOne({ googleId });
-
-  // 2. Si no, buscar por email y vincular
-  if (!user) {
-    user = await User.findOne({ email: email.toLowerCase() });
-    if (user) {
-      user.googleId = googleId;
-      await user.save();
-    }
+  if (!email_verified) {
+    return res.status(400).json({ message: 'El email de Google no está verificado' });
   }
 
-  // 3. Si no existe, crear nuevo usuario
-  if (!user) {
-    user = await User.create({
-      name,
-      email: email.toLowerCase(),
-      googleId,
-      role: 'user',
-    });
+  let user;
+  try {
+    // 1. Buscar por googleId
+    user = await User.findOne({ googleId });
+
+    // 2. Si no, buscar por email y vincular
+    if (!user) {
+      user = await User.findOne({ email: email.toLowerCase() });
+      if (user) {
+        user.googleId = googleId;
+        await user.save();
+      }
+    }
+
+    // 3. Si no existe, crear nuevo usuario
+    if (!user) {
+      user = await User.create({
+        name,
+        email: email.toLowerCase(),
+        googleId,
+        role: 'user',
+      });
+    }
+  } catch (err) {
+    return res.status(500).json({ message: 'Error al procesar el usuario' });
   }
 
   return res.json({

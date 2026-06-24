@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import api from '../api/client';
 
 const AuthContext = createContext(null);
@@ -9,32 +9,32 @@ export function AuthProvider({ children }) {
     return raw ? JSON.parse(raw) : null;
   });
 
-  const login = async (email, password) => {
+  const login = useCallback(async (email, password) => {
     const { data } = await api.post('/auth/login', { email, password });
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
     setUser(data.user);
-  };
+  }, []);
 
-  const loginWithGoogle = async (credential) => {
+  const loginWithGoogle = useCallback(async (credential) => {
     const { data } = await api.post('/auth/google', { credential });
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
     setUser(data.user);
-  };
+  }, []);
 
-  const loginWithMagic = async (token) => {
+  const loginWithMagic = useCallback(async (token) => {
     const { data } = await api.post('/auth/magic-link/login', { token });
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
     setUser(data.user);
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
-  };
+  }, []);
 
   const value = useMemo(
     () => ({ user, login, loginWithGoogle, loginWithMagic, logout }),

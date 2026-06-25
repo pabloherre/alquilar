@@ -2,24 +2,31 @@ import { useState } from 'react';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 import {
   AppBar,
-  Toolbar,
-  Typography,
-  IconButton,
+  Avatar,
+  Box,
   Button,
+  Chip,
+  Divider,
   Drawer,
+  IconButton,
   List,
   ListItemButton,
+  ListItemIcon,
   ListItemText,
-  Box,
-  Chip,
-  Stack
+  Stack,
+  Toolbar,
+  Typography
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import LogoutIcon from '@mui/icons-material/Logout';
-import AddBusinessIcon from '@mui/icons-material/AddBusiness';
+import AddCircleIcon from '@mui/icons-material/AddCircle';
 import HomeIcon from '@mui/icons-material/Home';
+import LockIcon from '@mui/icons-material/Lock';
 import LockResetIcon from '@mui/icons-material/LockReset';
+import AddBusinessIcon from '@mui/icons-material/AddBusiness';
 import { useAuth } from '../context/AuthContext';
+
+const DRAWER_WIDTH = 280;
 
 export default function Topbar() {
   const { user, logout } = useAuth();
@@ -28,28 +35,51 @@ export default function Topbar() {
 
   if (!user) return null;
 
-  const links = [
-    { to: '/', label: 'Inicio', icon: <HomeIcon fontSize="small" /> },
-    { to: '/change-password', label: 'Contrasena', icon: <LockResetIcon fontSize="small" /> },
-    ...(user.role === 'admin' ? [{ to: '/admin/new-contract', label: 'Nuevo', icon: <AddBusinessIcon fontSize="small" /> }] : [])
+  const navLinks = [
+    { to: '/', label: 'Inicio', icon: <HomeIcon /> },
+    { to: '/change-password', label: 'Cambiar contraseña', icon: <LockIcon /> },
+    ...(user.role === 'admin'
+      ? [{ to: '/admin/new-contract', label: 'Nuevo contrato', icon: <AddCircleIcon /> }]
+      : [])
   ];
+
+  const userInitial = (user.name || user.email || '?')[0].toUpperCase();
+  const roleLabel = user.role === 'admin' ? 'Administrador' : 'Inquilino';
 
   return (
     <>
-      <AppBar position="sticky" color="inherit" elevation={0} sx={{ borderBottom: '1px solid #dbe5ef' }}>
-        <Toolbar sx={{ gap: 1.5 }}>
-          <IconButton edge="start" onClick={() => setOpen(true)} sx={{ display: { md: 'none' } }}>
+      <AppBar
+        position="sticky"
+        color="inherit"
+        elevation={0}
+        sx={{ borderBottom: '1px solid #dbe5ef', minHeight: { xs: 56, md: 64 } }}
+      >
+        <Toolbar sx={{ gap: 1.5, minHeight: { xs: 56, md: 64 } }}>
+          <IconButton
+            edge="start"
+            onClick={() => setOpen(true)}
+            sx={{ display: { md: 'none' } }}
+            aria-label="Abrir menú"
+          >
             <MenuIcon />
           </IconButton>
 
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            AlquilAR Contratos
+          <Typography
+            variant="h6"
+            sx={{ flexGrow: 1, textAlign: { xs: 'center', md: 'left' } }}
+          >
+            AlquilAR
           </Typography>
 
-          <Chip label={user.role === 'admin' ? 'Administrador' : 'Inquilino'} color="primary" size="small" />
+          <Chip
+            label={roleLabel}
+            color="primary"
+            size="small"
+            sx={{ display: { xs: 'none', md: 'flex' } }}
+          />
 
           <Stack direction="row" spacing={1} sx={{ display: { xs: 'none', md: 'flex' } }}>
-            {links.map((link) => (
+            {navLinks.map((link) => (
               <Button
                 key={link.to}
                 component={RouterLink}
@@ -67,22 +97,49 @@ export default function Topbar() {
         </Toolbar>
       </AppBar>
 
-      <Drawer anchor="left" open={open} onClose={() => setOpen(false)}>
-        <Box sx={{ width: 260 }} role="presentation" onClick={() => setOpen(false)}>
-          <Box sx={{ p: 2, borderBottom: '1px solid #e2e8f0' }}>
-            <Typography variant="h6">Menú</Typography>
+      <Drawer
+        anchor="left"
+        open={open}
+        onClose={() => setOpen(false)}
+        PaperProps={{ sx: { width: DRAWER_WIDTH } }}
+      >
+        <Box sx={{ p: 2.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Avatar sx={{ bgcolor: 'primary.main', width: 44, height: 44, fontWeight: 700 }}>
+            {userInitial}
+          </Avatar>
+          <Box sx={{ overflow: 'hidden' }}>
+            <Typography variant="subtitle2" noWrap sx={{ fontWeight: 600 }}>
+              {user.name || user.email}
+            </Typography>
+            <Chip label={roleLabel} color="primary" size="small" sx={{ mt: 0.3 }} />
           </Box>
-          <List>
-            {links.map((link) => (
-              <ListItemButton key={link.to} component={RouterLink} to={link.to} selected={location.pathname === link.to}>
-                <ListItemText primary={link.label} />
-              </ListItemButton>
-            ))}
-            <ListItemButton onClick={logout}>
-              <ListItemText primary="Salir" />
-            </ListItemButton>
-          </List>
         </Box>
+
+        <Divider />
+
+        <List disablePadding>
+          {navLinks.map((link) => (
+            <ListItemButton
+              key={link.to}
+              component={RouterLink}
+              to={link.to}
+              selected={location.pathname === link.to}
+              onClick={() => setOpen(false)}
+            >
+              <ListItemIcon sx={{ minWidth: 40 }}>{link.icon}</ListItemIcon>
+              <ListItemText primary={link.label} />
+            </ListItemButton>
+          ))}
+        </List>
+
+        <Divider sx={{ mt: 'auto' }} />
+
+        <List disablePadding>
+          <ListItemButton onClick={() => { setOpen(false); logout(); }}>
+            <ListItemIcon sx={{ minWidth: 40 }}><LogoutIcon /></ListItemIcon>
+            <ListItemText primary="Cerrar sesión" />
+          </ListItemButton>
+        </List>
       </Drawer>
     </>
   );

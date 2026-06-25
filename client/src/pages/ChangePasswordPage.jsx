@@ -65,6 +65,7 @@ export default function ChangePasswordPage() {
               onChange={(e) => setCurrentPassword(e.target.value)}
               autoComplete="current-password"
               fullWidth
+              inputProps={{ style: { fontSize: 16 } }}
             />
 
             <TextField
@@ -74,6 +75,7 @@ export default function ChangePasswordPage() {
               onChange={(e) => setNewPassword(e.target.value)}
               autoComplete="new-password"
               fullWidth
+              inputProps={{ style: { fontSize: 16 } }}
             />
 
             <TextField
@@ -83,9 +85,10 @@ export default function ChangePasswordPage() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               autoComplete="new-password"
               fullWidth
+              inputProps={{ style: { fontSize: 16 } }}
             />
 
-            <Button type="submit" variant="contained" startIcon={<LockResetIcon />} disabled={saving}>
+            <Button type="submit" variant="contained" startIcon={<LockResetIcon />} disabled={saving} fullWidth>
               Actualizar contrasena
             </Button>
           </Stack>

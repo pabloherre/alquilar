@@ -43,15 +43,15 @@ export default function LoginPage() {
               Accedé al panel de contratos y recibos.
             </Typography>
             <Stack component="form" onSubmit={onSubmit} spacing={2}>
-              <TextField label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required fullWidth />
-              <TextField label="Contraseña" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required fullWidth />
-              <Button type="submit" variant="contained" size="large" startIcon={<LoginIcon />}>
+              <TextField label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required fullWidth inputProps={{ style: { fontSize: 16 } }} />
+              <TextField label="Contraseña" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required fullWidth inputProps={{ style: { fontSize: 16 } }} />
+              <Button type="submit" variant="contained" size="large" startIcon={<LoginIcon />} fullWidth>
                 Entrar
               </Button>
             </Stack>
             <Divider>o</Divider>
-            <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-              <GoogleLogin onSuccess={onGoogleSuccess} onError={() => setError('Error al autenticar con Google')} />
+            <Box sx={{ width: '100%' }}>
+              <GoogleLogin onSuccess={onGoogleSuccess} onError={() => setError('Error al autenticar con Google')} width="100%" />
             </Box>
             {error && <Alert severity="error">{error}</Alert>}
           </Stack>

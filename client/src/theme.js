@@ -22,6 +22,16 @@ const theme = createTheme({
           boxShadow: '0 10px 24px rgba(15, 23, 42, 0.07)'
         }
       }
+    },
+    MuiButton: {
+      styleOverrides: {
+        root: { minHeight: 44 }
+      }
+    },
+    MuiListItemButton: {
+      styleOverrides: {
+        root: { minHeight: 48 }
+      }
     }
   }
 });

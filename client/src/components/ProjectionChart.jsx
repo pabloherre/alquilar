@@ -12,7 +12,7 @@ import {
 } from 'recharts';
 import { formatCompactMoney, formatDateDisplay } from '../utils/formatters';
 
-export default function ProjectionChart({ data, currentPeriodStart, currentPeriodEnd, periodMonths }) {
+export default function ProjectionChart({ data, currentPeriodStart, currentPeriodEnd, periodMonths, height }) {
   const chartData = (data || []).map((point) => ({
     ...point,
     ts: dayjs(point.date).valueOf()
@@ -34,7 +34,7 @@ export default function ProjectionChart({ data, currentPeriodStart, currentPerio
           />
         )}
       </Stack>
-      <div style={{ width: '100%', height: 300 }}>
+      <div style={{ width: '100%', height: height ?? 300 }}>
         <ResponsiveContainer>
           <LineChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" />

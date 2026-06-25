@@ -2,11 +2,16 @@ import { useEffect, useState } from 'react';
 import dayjs from 'dayjs';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Alert,
+  Box,
   Button,
   Card,
   CardContent,
   Chip,
+  Divider,
   Link,
   MenuItem,
   Stack,
@@ -17,8 +22,12 @@ import {
   TableHead,
   TableRow,
   TextField,
-  Typography
+  Typography,
+  useMediaQuery,
+  useTheme
 } from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PaymentIcon from '@mui/icons-material/Payment';
 import PreviewIcon from '@mui/icons-material/Preview';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
@@ -55,10 +64,56 @@ function statusChip(status) {
   return <Chip size="small" label="Futura" />;
 }
 
+function InstallmentCard({ row, isAdmin, onDownload, onGenerate, generatingKey }) {
+  const key = `${row.year}-${String(row.month).padStart(2, '0')}`;
+  return (
+    <Card variant="outlined" sx={{ p: 0 }}>
+      <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1}>
+          <Box>
+            <Typography variant="subtitle2" fontWeight={600}>
+              {formatMonthYearDisplay(row.periodStart)}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {formatMoneyNoDecimals(row.amountUsd)}
+            </Typography>
+          </Box>
+          <Stack direction="row" spacing={1} alignItems="center">
+            {statusChip(row.status)}
+            {row.receiptId && (
+              <Button
+                size="small"
+                variant="text"
+                startIcon={<DownloadIcon />}
+                onClick={() => onDownload(row.receiptId, row.year, row.month)}
+              >
+                Recibo
+              </Button>
+            )}
+            {isAdmin && (
+              <Button
+                size="small"
+                variant={row.receiptId ? 'outlined' : 'contained'}
+                startIcon={<PaymentIcon />}
+                onClick={() => onGenerate(row.year, row.month)}
+                disabled={generatingKey === key}
+              >
+                {row.receiptId ? 'Regen.' : 'Generar'}
+              </Button>
+            )}
+          </Stack>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function ContractDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   const [contract, setContract] = useState(null);
   const [projection, setProjection] = useState([]);
@@ -89,7 +144,6 @@ export default function ContractDetailPage() {
   });
   const [tenants, setTenants] = useState([]);
   const [savingEdit, setSavingEdit] = useState(false);
-
   const [generatingReceiptKey, setGeneratingReceiptKey] = useState('');
 
   const isAdmin = user?.role === 'admin';
@@ -155,7 +209,6 @@ export default function ContractDetailPage() {
 
   const saveContractEdits = async () => {
     setError('');
-
     const payload = {
       title: editForm.title,
       tenantId: editForm.tenantId,
@@ -207,9 +260,7 @@ export default function ContractDetailPage() {
     try {
       const { data } = await api.post(`/contracts/${id}/receipts/generate`, null, { params: { year, month } });
       await load();
-      if (data?._id) {
-        await downloadReceiptById(data._id, year, month);
-      }
+      if (data?._id) await downloadReceiptById(data._id, year, month);
     } catch (err) {
       setError(err?.response?.data?.message || 'No se pudo generar el comprobante para ese periodo');
     } finally {
@@ -239,7 +290,6 @@ export default function ContractDetailPage() {
       setError('El monto manual debe ser un numero mayor a 0');
       return;
     }
-
     setSavingManual(true);
     try {
       await api.patch(`/contracts/${id}`, { manualNextAmountUsd: value });
@@ -269,32 +319,13 @@ export default function ContractDetailPage() {
     setError('');
     const baseAmount = Number(renewBaseAmountInput);
     const durationYears = Number(renewDurationYearsInput);
-
-    if (!renewStartDateInput) {
-      setError('La fecha de inicio del nuevo contrato es obligatoria');
-      return;
-    }
-    if (!Number.isFinite(baseAmount) || baseAmount <= 0) {
-      setError('El monto inicial debe ser mayor a 0');
-      return;
-    }
-    if (!Number.isFinite(durationYears) || durationYears <= 0) {
-      setError('La duracion debe ser mayor a 0');
-      return;
-    }
-
+    if (!renewStartDateInput) { setError('La fecha de inicio del nuevo contrato es obligatoria'); return; }
+    if (!Number.isFinite(baseAmount) || baseAmount <= 0) { setError('El monto inicial debe ser mayor a 0'); return; }
+    if (!Number.isFinite(durationYears) || durationYears <= 0) { setError('La duracion debe ser mayor a 0'); return; }
     setRenewing(true);
     try {
-      const payload = {
-        startDate: renewStartDateInput,
-        baseAmountUsd: baseAmount,
-        durationYears
-      };
-      const { data } = await api.post(`/contracts/${id}/renew`, payload);
-      if (data?.newContract?._id) {
-        navigate(`/contracts/${data.newContract._id}`);
-        return;
-      }
+      const { data } = await api.post(`/contracts/${id}/renew`, { startDate: renewStartDateInput, baseAmountUsd: baseAmount, durationYears });
+      if (data?.newContract?._id) { navigate(`/contracts/${data.newContract._id}`); return; }
       await load();
     } catch (err) {
       setError(err?.response?.data?.message || 'No se pudo renovar el contrato');
@@ -303,14 +334,11 @@ export default function ContractDetailPage() {
     }
   };
 
-  if (!contract) return <Typography>Cargando...</Typography>;
+  if (!contract) return <Typography sx={{ p: 3 }}>Cargando...</Typography>;
 
   const periodMonths = Number(contract.incrementFrequencyMonths || 0);
   const periodEnd = dayjs(contract.nextIncrementDate).startOf('month').format('YYYY-MM-DD');
-  const periodStart = dayjs(contract.nextIncrementDate)
-    .subtract(periodMonths, 'month')
-    .startOf('month')
-    .format('YYYY-MM-DD');
+  const periodStart = dayjs(contract.nextIncrementDate).subtract(periodMonths, 'month').startOf('month').format('YYYY-MM-DD');
 
   const daysUntilIncrement = dayjs(contract.nextIncrementDate).startOf('day').diff(dayjs().startOf('day'), 'day');
   const isIncrementOverdue = daysUntilIncrement < 0;
@@ -324,297 +352,287 @@ export default function ContractDetailPage() {
 
   const isContractExpired = contract.status === 'expired';
 
-  return (
-    <Stack spacing={2.5}>
-      {error && <Alert severity="error">{error}</Alert>}
+  const infoContent = (
+    <Stack spacing={1.5}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+        <Box>
+          <Typography variant="caption" color="text.disabled">Monto actual</Typography>
+          <Typography variant="h5" fontWeight={700} color="primary.main">
+            {formatMoneyNoDecimals(contract.currentAmountUsd)}
+          </Typography>
+        </Box>
+      </Stack>
 
-      <Card
-        sx={{
-          border: isContractExpired ? '1px solid' : 'none',
-          borderColor: isContractExpired ? 'error.main' : 'transparent',
-          backgroundColor: isContractExpired ? 'rgba(211, 47, 47, 0.06)' : 'background.paper'
-        }}
-      >
+      <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+        <Chip label={`Índice: ${contract.indexType}`} color="secondary" size="small" sx={{ color: 'common.white' }} />
+        <Chip label={`Próx. incremento: ${formatDateDisplay(contract.nextIncrementDate)}`} size="small" color={nextIncrementChipColor} />
+        <Chip label={`Vence: ${formatDateDisplay(contract.expirationDate)}`} size="small" color={expirationChipColor} />
+      </Stack>
+
+      <Typography variant="body2" color="text.secondary">
+        Inquilino: <strong>{contract.tenant?.name}</strong>
+      </Typography>
+
+      {isContractExpired && <Alert severity="error">Este contrato está marcado como expirado.</Alert>}
+      {(isIncrementNear || isIncrementOverdue) && (
+        <Alert severity={isIncrementOverdue ? 'error' : 'warning'}>
+          {isIncrementOverdue
+            ? `El incremento está vencido desde hace ${Math.abs(daysUntilIncrement)} días.`
+            : `Faltan ${daysUntilIncrement} días para el próximo incremento.`}
+        </Alert>
+      )}
+      {(isExpirationNear || isExpirationOverdue) && (
+        <Alert severity={isExpirationOverdue ? 'error' : 'warning'}>
+          {isExpirationOverdue
+            ? `El contrato está vencido desde hace ${Math.abs(daysUntilExpiration)} días.`
+            : `Faltan ${daysUntilExpiration} días para el vencimiento del contrato.`}
+        </Alert>
+      )}
+      {contract.manualNextAmountUsd !== null && contract.manualNextAmountUsd !== undefined && (
+        <Alert severity="info">Próxima cuota manual pendiente: {formatCompactMoney(contract.manualNextAmountUsd)}</Alert>
+      )}
+    </Stack>
+  );
+
+  const chartContent = (
+    <ProjectionChart
+      data={projection}
+      currentPeriodStart={periodStart}
+      currentPeriodEnd={periodEnd}
+      periodMonths={periodMonths}
+      height={isMobile ? 200 : 300}
+    />
+  );
+
+  const installmentsContent = isMobile ? (
+    <Stack spacing={1}>
+      {installments.map((row) => (
+        <InstallmentCard
+          key={`${row.year}-${row.month}`}
+          row={row}
+          isAdmin={isAdmin}
+          onDownload={downloadReceiptById}
+          onGenerate={genReceiptForMonth}
+          generatingKey={generatingReceiptKey}
+        />
+      ))}
+    </Stack>
+  ) : (
+    <TableContainer>
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            <TableCell>Periodo</TableCell>
+            <TableCell>Monto</TableCell>
+            {isAdmin && <TableCell>Origen</TableCell>}
+            <TableCell>Estado</TableCell>
+            <TableCell>Comprobante</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {installments.map((row) => (
+            <TableRow key={`${row.year}-${row.month}`} hover>
+              <TableCell>{formatMonthYearDisplay(row.periodStart)}</TableCell>
+              <TableCell>{formatMoneyNoDecimals(row.amountUsd)}</TableCell>
+              {isAdmin && <TableCell>{SOURCE_LABELS[row.source] || row.source}</TableCell>}
+              <TableCell>{statusChip(row.status)}</TableCell>
+              <TableCell>
+                <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                  {row.receiptId ? (
+                    <Button size="small" variant="text" startIcon={<DownloadIcon />} onClick={() => downloadReceiptById(row.receiptId, row.year, row.month)}>
+                      Descargar
+                    </Button>
+                  ) : (
+                    <Typography variant="caption" color="text.secondary">-</Typography>
+                  )}
+                  {isAdmin && (
+                    <Button
+                      size="small"
+                      variant={row.receiptId ? 'outlined' : 'contained'}
+                      startIcon={<PaymentIcon />}
+                      onClick={() => genReceiptForMonth(row.year, row.month)}
+                      disabled={generatingReceiptKey === `${row.year}-${String(row.month).padStart(2, '0')}`}
+                    >
+                      {row.receiptId ? 'Regenerar' : 'Generar'}
+                    </Button>
+                  )}
+                </Stack>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+
+  const adminContent = isAdmin && (
+    <Stack spacing={2}>
+      <Card variant="outlined">
         <CardContent>
-          <Stack spacing={1.2}>
-            <Typography variant="h5">{contract.title}</Typography>
-            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-              <Chip label={`Indice: ${contract.indexType}`} color="secondary" size="small" sx={{ width: 'fit-content', color: 'common.white' }} />
-              <Chip label={`Monto actual: ${formatMoneyNoDecimals(contract.currentAmountUsd)}`} size="small" />
-              <Chip label={`Proximo incremento: ${formatDateDisplay(contract.nextIncrementDate)}`} size="small" color={nextIncrementChipColor} />
-              <Chip label={`Vence: ${formatDateDisplay(contract.expirationDate)}`} size="small" color={expirationChipColor} />
+          <Stack spacing={1.5}>
+            <Typography variant="subtitle1" fontWeight={600}>Editar contrato</Typography>
+            <TextField label="Titulo" value={editForm.title} onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))} fullWidth inputProps={{ style: { fontSize: 16 } }} />
+            <TextField select label="Inquilino" value={editForm.tenantId} onChange={(e) => setEditForm((f) => ({ ...f, tenantId: e.target.value }))} fullWidth inputProps={{ style: { fontSize: 16 } }}>
+              <MenuItem value="">Seleccionar</MenuItem>
+              {tenants.map((t) => <MenuItem key={t._id || t.id} value={t._id || t.id}>{t.name} ({t.email})</MenuItem>)}
+            </TextField>
+            <TextField type="date" label="Fecha inicio" InputLabelProps={{ shrink: true }} value={editForm.startDate} onChange={(e) => setEditForm((f) => ({ ...f, startDate: e.target.value }))} fullWidth inputProps={{ style: { fontSize: 16 } }} />
+            <TextField type="number" label="Monto inicial ARS" inputProps={{ step: '0.01', min: 0, style: { fontSize: 16 } }} value={editForm.baseAmountUsd} onChange={(e) => setEditForm((f) => ({ ...f, baseAmountUsd: e.target.value }))} fullWidth />
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+              <TextField select label="Frecuencia (meses)" value={editForm.incrementFrequencyMonths} onChange={(e) => setEditForm((f) => ({ ...f, incrementFrequencyMonths: e.target.value }))} fullWidth inputProps={{ style: { fontSize: 16 } }}>
+                {[2, 3, 4, 6, 12].map((m) => <MenuItem key={m} value={m}>{m}</MenuItem>)}
+              </TextField>
+              <TextField type="number" label="Duracion (años)" inputProps={{ min: 1, style: { fontSize: 16 } }} value={editForm.durationYears} onChange={(e) => setEditForm((f) => ({ ...f, durationYears: e.target.value }))} fullWidth />
+              <TextField select label="Indice" value={editForm.indexType} onChange={(e) => setEditForm((f) => ({ ...f, indexType: e.target.value }))} fullWidth inputProps={{ style: { fontSize: 16 } }}>
+                {INDEXES.map((i) => <MenuItem key={i} value={i}>{i}</MenuItem>)}
+              </TextField>
             </Stack>
-
-            {isContractExpired && <Alert severity="error">Este contrato esta marcado como expirado.</Alert>}
-
-            {(isIncrementNear || isIncrementOverdue) && (
-              <Alert severity={isIncrementOverdue ? 'error' : 'warning'}>
-                {isIncrementOverdue
-                  ? `El incremento esta vencido desde hace ${Math.abs(daysUntilIncrement)} dias.`
-                  : `Faltan ${daysUntilIncrement} dias para el proximo incremento.`}
-              </Alert>
-            )}
-
-            {(isExpirationNear || isExpirationOverdue) && (
-              <Alert severity={isExpirationOverdue ? 'error' : 'warning'}>
-                {isExpirationOverdue
-                  ? `El contrato esta vencido desde hace ${Math.abs(daysUntilExpiration)} dias.`
-                  : `Faltan ${daysUntilExpiration} dias para el vencimiento del contrato.`}
-              </Alert>
-            )}
-
-            <Typography variant="body2" color="text.secondary">Inquilino: <strong>{contract.tenant?.name}</strong></Typography>
-            {contract.manualNextAmountUsd !== null && contract.manualNextAmountUsd !== undefined && (
-              <Alert severity="info">Proxima cuota manual pendiente: {formatCompactMoney(contract.manualNextAmountUsd)}</Alert>
-            )}
+            <TextField type="number" label="Override % (interno)" inputProps={{ step: '0.01', style: { fontSize: 16 } }} value={editForm.manualOverridePercent} onChange={(e) => setEditForm((f) => ({ ...f, manualOverridePercent: e.target.value }))} fullWidth />
+            <Button variant="contained" onClick={saveContractEdits} disabled={savingEdit} fullWidth={isMobile}>
+              Guardar cambios del contrato
+            </Button>
           </Stack>
         </CardContent>
       </Card>
 
-      {isAdmin && (
-        <Card
-          sx={{
-            border: isContractExpired ? '1px solid' : 'none',
-            borderColor: isContractExpired ? 'error.main' : 'transparent',
-            backgroundColor: isContractExpired ? 'rgba(211, 47, 47, 0.06)' : 'background.paper'
-          }}
+      <Divider />
+
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+        <TextField type="number" label="Proxima cuota manual ARS" inputProps={{ step: '0.01', min: 0, style: { fontSize: 16 } }} value={manualNextAmountInput} onChange={(e) => setManualNextAmountInput(e.target.value)} fullWidth />
+        <Button variant="contained" onClick={saveManualNextAmount} disabled={savingManual} sx={{ flexShrink: 0 }}>Guardar</Button>
+        <Button variant="outlined" onClick={clearManualNextAmount} disabled={savingManual} sx={{ flexShrink: 0 }}>Limpiar</Button>
+      </Stack>
+
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} flexWrap="wrap">
+        <Button variant="outlined" startIcon={<PreviewIcon />} onClick={previewIncrement} fullWidth={isMobile}>Previsualizar incremento</Button>
+        <Button variant="contained" startIcon={<TaskAltIcon />} onClick={confirmIncrement} fullWidth={isMobile}>Confirmar incremento</Button>
+        <Button variant="outlined" startIcon={<PaymentIcon />} onClick={genReceipt} fullWidth={isMobile}>Generar recibo del mes</Button>
+        <Button variant="outlined" startIcon={<LinkIcon />} onClick={generateMagicLinkForContract} disabled={generatingMagicLink} fullWidth={isMobile}>
+          Generar magic link
+        </Button>
+      </Stack>
+
+      {magicLink && (
+        <Alert severity="info">
+          Magic link: <Link href={magicLink} target="_blank" rel="noreferrer">Abrir enlace</Link>
+        </Alert>
+      )}
+      {preview && (
+        <Alert severity="success">
+          Incremento según índice {contract.indexType}: {preview.percent.toFixed(2)}% → {formatCompactMoney(preview.newAmount)}
+        </Alert>
+      )}
+
+      <Divider />
+
+      <Card variant="outlined">
+        <CardContent>
+          <Stack spacing={1.5}>
+            <Typography variant="subtitle1" fontWeight={600}>Expirar y crear nuevo contrato</Typography>
+            <TextField type="date" label="Inicio nuevo contrato" InputLabelProps={{ shrink: true }} value={renewStartDateInput} onChange={(e) => setRenewStartDateInput(e.target.value)} fullWidth inputProps={{ style: { fontSize: 16 } }} />
+            <TextField type="number" label="Monto inicial ARS" inputProps={{ step: '0.01', min: 0, style: { fontSize: 16 } }} value={renewBaseAmountInput} onChange={(e) => setRenewBaseAmountInput(e.target.value)} fullWidth />
+            <TextField type="number" label="Duracion (años)" inputProps={{ step: '1', min: 1, style: { fontSize: 16 } }} value={renewDurationYearsInput} onChange={(e) => setRenewDurationYearsInput(e.target.value)} fullWidth />
+            <Button variant="contained" color="warning" onClick={renewContract} disabled={renewing} fullWidth={isMobile}>
+              Expirar contrato y crear nuevo
+            </Button>
+          </Stack>
+        </CardContent>
+      </Card>
+    </Stack>
+  );
+
+  if (isMobile) {
+    return (
+      <Stack spacing={1.5}>
+        <Button
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate('/')}
+          sx={{ alignSelf: 'flex-start' }}
         >
+          Contratos
+        </Button>
+
+        <Typography variant="h5" fontWeight={700}>{contract.title}</Typography>
+
+        {error && <Alert severity="error">{error}</Alert>}
+
+        <Accordion defaultExpanded>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography fontWeight={600}>Información del contrato</Typography>
+          </AccordionSummary>
+          <AccordionDetails>{infoContent}</AccordionDetails>
+        </Accordion>
+
+        <Accordion>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography fontWeight={600}>Proyección</Typography>
+          </AccordionSummary>
+          <AccordionDetails sx={{ px: 0 }}>{chartContent}</AccordionDetails>
+        </Accordion>
+
+        <Accordion>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography fontWeight={600}>Cuotas e historial</Typography>
+          </AccordionSummary>
+          <AccordionDetails sx={{ px: 1 }}>{installmentsContent}</AccordionDetails>
+        </Accordion>
+
+        {isAdmin && (
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography fontWeight={600}>Gestión</Typography>
+            </AccordionSummary>
+            <AccordionDetails>{adminContent}</AccordionDetails>
+          </Accordion>
+        )}
+      </Stack>
+    );
+  }
+
+  return (
+    <Stack spacing={2.5}>
+      <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/')} sx={{ alignSelf: 'flex-start' }}>
+        Contratos
+      </Button>
+
+      {error && <Alert severity="error">{error}</Alert>}
+
+      <Card sx={{
+        border: isContractExpired ? '1px solid' : 'none',
+        borderColor: isContractExpired ? 'error.main' : 'transparent',
+        backgroundColor: isContractExpired ? 'rgba(211, 47, 47, 0.06)' : 'background.paper'
+      }}>
+        <CardContent>
+          <Stack spacing={0.5} sx={{ mb: 1.5 }}>
+            <Typography variant="h5">{contract.title}</Typography>
+          </Stack>
+          {infoContent}
+        </CardContent>
+      </Card>
+
+      {isAdmin && (
+        <Card sx={{
+          border: isContractExpired ? '1px solid' : 'none',
+          borderColor: isContractExpired ? 'error.main' : 'transparent',
+          backgroundColor: isContractExpired ? 'rgba(211, 47, 47, 0.06)' : 'background.paper'
+        }}>
           <CardContent>
-            <Stack spacing={1.5}>
-              <Typography variant="h6">Acciones de administracion</Typography>
-
-              <Card variant="outlined">
-                <CardContent>
-                  <Stack spacing={1.5}>
-                    <Typography variant="subtitle1">Editar contrato</Typography>
-
-                    <TextField
-                      label="Titulo"
-                      value={editForm.title}
-                      onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))}
-                      fullWidth
-                    />
-
-                    <TextField
-                      select
-                      label="Inquilino"
-                      value={editForm.tenantId}
-                      onChange={(e) => setEditForm((f) => ({ ...f, tenantId: e.target.value }))}
-                      fullWidth
-                    >
-                      <MenuItem value="">Seleccionar</MenuItem>
-                      {tenants.map((t) => (
-                        <MenuItem key={t._id || t.id} value={t._id || t.id}>
-                          {t.name} ({t.email})
-                        </MenuItem>
-                      ))}
-                    </TextField>
-
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                      <TextField
-                        type="date"
-                        label="Fecha inicio"
-                        InputLabelProps={{ shrink: true }}
-                        value={editForm.startDate}
-                        onChange={(e) => setEditForm((f) => ({ ...f, startDate: e.target.value }))}
-                        fullWidth
-                      />
-                      <TextField
-                        type="number"
-                        label="Monto inicial ARS"
-                        inputProps={{ step: '0.01', min: 0 }}
-                        value={editForm.baseAmountUsd}
-                        onChange={(e) => setEditForm((f) => ({ ...f, baseAmountUsd: e.target.value }))}
-                        fullWidth
-                      />
-                    </Stack>
-
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                      <TextField
-                        select
-                        label="Frecuencia (meses)"
-                        value={editForm.incrementFrequencyMonths}
-                        onChange={(e) => setEditForm((f) => ({ ...f, incrementFrequencyMonths: e.target.value }))}
-                        fullWidth
-                      >
-                        {[2, 3, 4, 6, 12].map((m) => (
-                          <MenuItem key={m} value={m}>{m}</MenuItem>
-                        ))}
-                      </TextField>
-                      <TextField
-                        type="number"
-                        label="Duracion (anos)"
-                        inputProps={{ min: 1 }}
-                        value={editForm.durationYears}
-                        onChange={(e) => setEditForm((f) => ({ ...f, durationYears: e.target.value }))}
-                        fullWidth
-                      />
-                      <TextField
-                        select
-                        label="Indice"
-                        value={editForm.indexType}
-                        onChange={(e) => setEditForm((f) => ({ ...f, indexType: e.target.value }))}
-                        fullWidth
-                      >
-                        {INDEXES.map((i) => (
-                          <MenuItem key={i} value={i}>{i}</MenuItem>
-                        ))}
-                      </TextField>
-                    </Stack>
-
-                    <TextField
-                      type="number"
-                      label="Override % (interno)"
-                      inputProps={{ step: '0.01' }}
-                      value={editForm.manualOverridePercent}
-                      onChange={(e) => setEditForm((f) => ({ ...f, manualOverridePercent: e.target.value }))}
-                      fullWidth
-                    />
-
-                    <Button variant="contained" onClick={saveContractEdits} disabled={savingEdit}>
-                      Guardar cambios del contrato
-                    </Button>
-                  </Stack>
-                </CardContent>
-              </Card>
-
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                <TextField
-                  type="number"
-                  label="Proxima cuota manual ARS"
-                  inputProps={{ step: '0.01', min: 0 }}
-                  value={manualNextAmountInput}
-                  onChange={(e) => setManualNextAmountInput(e.target.value)}
-                  fullWidth
-                />
-                <Button variant="contained" onClick={saveManualNextAmount} disabled={savingManual}>Guardar</Button>
-                <Button variant="outlined" onClick={clearManualNextAmount} disabled={savingManual}>Limpiar</Button>
-              </Stack>
-
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                <Button variant="outlined" startIcon={<PreviewIcon />} onClick={previewIncrement}>Previsualizar incremento</Button>
-                <Button variant="contained" startIcon={<TaskAltIcon />} onClick={confirmIncrement}>Confirmar incremento</Button>
-                <Button variant="outlined" startIcon={<PaymentIcon />} onClick={genReceipt}>Generar recibo del mes</Button>
-                <Button variant="outlined" startIcon={<LinkIcon />} onClick={generateMagicLinkForContract} disabled={generatingMagicLink}>
-                  Generar magic link
-                </Button>
-              </Stack>
-
-              {magicLink && (
-                <Alert severity="info">
-                  Magic link: <Link href={magicLink} target="_blank" rel="noreferrer">Abrir enlace</Link>
-                </Alert>
-              )}
-
-              {preview && (
-                <Alert severity="success">
-                  Incremento segun indice {contract.indexType}: {preview.percent.toFixed(2)}% a {formatCompactMoney(preview.newAmount)}
-                </Alert>
-              )}
-
-              <Card variant="outlined">
-                <CardContent>
-                  <Stack spacing={1.5}>
-                    <Typography variant="subtitle1">Expirar y crear nuevo contrato</Typography>
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                      <TextField
-                        type="date"
-                        label="Inicio nuevo contrato"
-                        InputLabelProps={{ shrink: true }}
-                        value={renewStartDateInput}
-                        onChange={(e) => setRenewStartDateInput(e.target.value)}
-                        fullWidth
-                      />
-                      <TextField
-                        type="number"
-                        label="Monto inicial ARS"
-                        inputProps={{ step: '0.01', min: 0 }}
-                        value={renewBaseAmountInput}
-                        onChange={(e) => setRenewBaseAmountInput(e.target.value)}
-                        fullWidth
-                      />
-                      <TextField
-                        type="number"
-                        label="Duracion (anos)"
-                        inputProps={{ step: '1', min: 1 }}
-                        value={renewDurationYearsInput}
-                        onChange={(e) => setRenewDurationYearsInput(e.target.value)}
-                        fullWidth
-                      />
-                    </Stack>
-                    <Button variant="contained" color="warning" onClick={renewContract} disabled={renewing}>
-                      Expirar contrato y crear nuevo
-                    </Button>
-                  </Stack>
-                </CardContent>
-              </Card>
-            </Stack>
+            <Typography variant="h6" sx={{ mb: 1.5 }}>Acciones de administración</Typography>
+            {adminContent}
           </CardContent>
         </Card>
       )}
 
-      <ProjectionChart data={projection} currentPeriodStart={periodStart} currentPeriodEnd={periodEnd} periodMonths={periodMonths} />
+      {chartContent}
 
-      <Card
-        sx={{
-          border: isContractExpired ? '1px solid' : 'none',
-          borderColor: isContractExpired ? 'error.main' : 'transparent',
-          backgroundColor: isContractExpired ? 'rgba(211, 47, 47, 0.06)' : 'background.paper'
-        }}
-      >
+      <Card sx={{
+        border: isContractExpired ? '1px solid' : 'none',
+        borderColor: isContractExpired ? 'error.main' : 'transparent',
+        backgroundColor: isContractExpired ? 'rgba(211, 47, 47, 0.06)' : 'background.paper'
+      }}>
         <CardContent>
-          <Typography variant="h6" sx={{ mb: 1.5 }}>Cuotas del contrato (historico + proyeccion)</Typography>
-          <TableContainer>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Periodo</TableCell>
-                  <TableCell>Monto</TableCell>
-                  {isAdmin && <TableCell>Origen</TableCell>}
-                  <TableCell>Estado</TableCell>
-                  <TableCell>Comprobante</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {installments.map((row) => (
-                  <TableRow key={`${row.year}-${row.month}`} hover>
-                    <TableCell>{formatMonthYearDisplay(row.periodStart)}</TableCell>
-                    <TableCell>{formatMoneyNoDecimals(row.amountUsd)}</TableCell>
-                    {isAdmin && <TableCell>{SOURCE_LABELS[row.source] || row.source}</TableCell>}
-                    <TableCell>{statusChip(row.status)}</TableCell>
-                    <TableCell>
-                      <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                        {row.receiptId ? (
-                          <Button
-                            size="small"
-                            variant="text"
-                            startIcon={<DownloadIcon />}
-                            onClick={() => downloadReceiptById(row.receiptId, row.year, row.month)}
-                          >
-                            Descargar
-                          </Button>
-                        ) : (
-                          <Typography variant="caption" color="text.secondary">-</Typography>
-                        )}
-
-                        {isAdmin && (
-                          <Button
-                            size="small"
-                            variant={row.receiptId ? 'outlined' : 'contained'}
-                            startIcon={<PaymentIcon />}
-                            onClick={() => genReceiptForMonth(row.year, row.month)}
-                            disabled={generatingReceiptKey === `${row.year}-${String(row.month).padStart(2, '0')}`}
-                          >
-                            {row.receiptId ? 'Regenerar' : 'Generar'}
-                          </Button>
-                        )}
-                      </Stack>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+          <Typography variant="h6" sx={{ mb: 1.5 }}>Cuotas del contrato (histórico + proyección)</Typography>
+          {installmentsContent}
         </CardContent>
       </Card>
     </Stack>

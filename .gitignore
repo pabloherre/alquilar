@@ -7,3 +7,5 @@ server/server/storage/receipts/*.pdf
 .idea/
 .junie/
 client/dist
+client_secret*
+.superpowers/*

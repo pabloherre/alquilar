@@ -22,8 +22,6 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import HomeIcon from '@mui/icons-material/Home';
 import LockIcon from '@mui/icons-material/Lock';
-import LockResetIcon from '@mui/icons-material/LockReset';
-import AddBusinessIcon from '@mui/icons-material/AddBusiness';
 import { useAuth } from '../context/AuthContext';
 
 const DRAWER_WIDTH = 280;

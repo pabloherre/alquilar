@@ -115,7 +115,7 @@ export default function NewContractPage() {
   return (
     <Stack spacing={2.5}>
       <Box>
-        <Typography variant={{ xs: 'h5', md: 'h4' }} component="h1">Nuevo contrato</Typography>
+        <Typography variant="h4" component="h1" sx={{ fontSize: { xs: '1.5rem', md: '2.125rem' } }}>Nuevo contrato</Typography>
         <Typography variant="body2" color="text.secondary">Carga rápida de contrato e inquilino desde una sola pantalla.</Typography>
       </Box>
 
